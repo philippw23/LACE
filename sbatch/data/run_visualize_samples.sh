@@ -24,10 +24,10 @@ GLOBAL_CONTEXT_FRACTION=0.15
 CONTEXT_FRACTION=0.15
 
 $home_dir/miniconda3/envs/$MY_CONDA_ENV/bin/python $home_dir/Project/src/data/visualize_samples.py \
-    --samples 10 \
-    --global_context_fraction $GLOBAL_CONTEXT_FRACTION \
+    --samples 4 \
     --context_fraction $CONTEXT_FRACTION \
-    --images F_OBERSCHENKEL_20200504_160629
+    --no-global_crop
+    #--images F_OBERSCHENKEL_20200504_160629
 
     #--btxrd \
     #--seed 42

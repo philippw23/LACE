@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=48:00:00
-#SBATCH --output="/mnt/nfs/homedirs/%u/Project/logs/lace/slurm-%j_lacev2_binary_A0.out"
+#SBATCH --output="/mnt/nfs/homedirs/%u/Project/logs/lace/slurm-%j_lacev2_binary_A4_8_mask_tokens.out"
 # Note: bump --time above when CV_DIR is set below — CV runs N folds back to
 # back in a single job, so it needs roughly N x a normal single-run time budget.
 
@@ -14,9 +14,9 @@
 # run (results land under run_<timestamp>/fold0/, fold1/, ...). Leave empty for
 # a normal single-split run using SPLITS below. Mutually exclusive with SPLITS.
 home_dir="/mnt/nfs/homedirs/$USER"
-CV_DIR=$home_dir/Project/data/internal_dataset/cv_binary   # empty = single-split run using SPLITS below (binary pretraining, no CV)
+CV_DIR= #$home_dir/Project/data/internal_dataset/cv_binary   # empty = single-split run using SPLITS below (binary pretraining, no CV)
 CV_PATTERN="split_binary_fold*.json"                # glob for fold files inside CV_DIR (empty = script default "split_binary_fold*.json")
-SPLITS=$home_dir/Project/data/internal_dataset/test/split_binary.json # data/internal_dataset/split_binary_final.json  # ignored when CV_DIR is set
+SPLITS=$home_dir/Project/data/internal_dataset/split_binary_final.json # data/internal_dataset/split_binary_final.json  # ignored when CV_DIR is set
 
 # ── Image encoder ─────────────────────────────────────────────────────────────
 IMAGE_ENCODER=biomedclip   # biomedclip only (chexfound backbone retired)
@@ -63,7 +63,7 @@ WEIGHT_DECAY=0.0014302030569857762
 # Optional per-loss stage control; OVERRIDES $LOSSES when non-empty. Space-separated
 # NAME:STAGES tokens over ita/sim/ortho/dice, stages from {1,2} or 0/none.
 # e.g. LOSS_STAGES="dice:1,2 ortho:1,2 ita:2 sim:2"
-LOSS_STAGES="dice:1,2 ortho:1,2 ita:2 sim:2"
+LOSS_STAGES="dice:1,2 ortho:none ita:2 sim:2"
 LEARN_LOSS_WEIGHTS=true
 LAMBDA_ITA=1.0           # starting point; adjusted by training when LEARN_LOSS_WEIGHTS=true
 LAMBDA_SIM=1.0
@@ -101,6 +101,9 @@ export TRANSFORMERS_CACHE=$home_dir/.cache/huggingface/transformers
 export WANDB_DIR=$home_dir/Project/logs
 export PATH=$home_dir/miniconda3/envs/$MY_CONDA_ENV/bin:$PATH
 export PYTHONPATH=$home_dir/Project/src
+
+START_TIME=$(date +%s)
+echo "Start time: $(date)"
 
 python $home_dir/Project/src/LACE/train/pretrain_v2.py \
     --image_encoder     $IMAGE_ENCODER \
@@ -155,3 +158,9 @@ python $home_dir/Project/src/LACE/train/pretrain_v2.py \
     --wandb_project lace-v2-pretrain \
     --wandb_entity  philipp-wiese
     #--losses            $LOSSES \
+
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+echo "End time: $(date)"
+printf "Pretraining duration: %02dh:%02dm:%02ds (%d s total)\n" \
+    $((ELAPSED/3600)) $((ELAPSED%3600/60)) $((ELAPSED%60)) $ELAPSED

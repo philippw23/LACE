@@ -1,5 +1,6 @@
 """Visualize random image/mask pairs for the default dataset or BTXRD."""
 import argparse
+import datetime
 import json
 import math
 import random
@@ -69,6 +70,13 @@ def parse_args(argv=None):
         default=True,
         help="Show the global crop (blue bounding box + global crop row). "
              "Use --no-global_crop to hide both (default: on).",
+    )
+    parser.add_argument(
+        "--grid_size",
+        type=int,
+        default=14,
+        help="ViT patch grid overlaid on the crop panels, e.g. 14 for a 224px "
+             "input with 16px patches (224 // 16). Use 0 to disable.",
     )
     return parser.parse_args(argv)
 
@@ -147,7 +155,7 @@ def make_red_overlay(image_arr: np.ndarray, mask: np.ndarray) -> np.ndarray:
     alpha = gaussian_filter(binary_mask, sigma=sigma)
     if alpha.max() > 0:
         alpha = alpha / alpha.max()
-    alpha = alpha * 0.6  # max opacity
+    alpha = alpha * 0.35  # max opacity
 
     gray = image_arr / image_arr.max() if image_arr.max() > 0 else image_arr.copy()
 
@@ -164,6 +172,50 @@ def tight_bbox(mask: np.ndarray) -> tuple[int, int, int, int] | None:
     if len(rows) == 0:
         return None
     return int(rows.min()), int(cols.min()), int(rows.max()), int(cols.max())
+
+
+def draw_patch_grid(ax, h: int, w: int, grid_size: int, color: str = "white", alpha: float = 0.4) -> None:
+    """Overlay grid_size x grid_size evenly spaced lines (the ViT patch grid).
+
+    Patches are an equal subdivision of the crop, so lines at i/grid_size
+    fractions of height/width line up with patch boundaries regardless of
+    the crop's pixel resolution (the model resizes it to image_size first).
+    """
+    if grid_size <= 0:
+        return
+    for i in range(1, grid_size):
+        ax.axvline(w * i / grid_size, color=color, linewidth=0.5, alpha=alpha)
+        ax.axhline(h * i / grid_size, color=color, linewidth=0.5, alpha=alpha)
+
+
+def save_panel(
+    image: np.ndarray,
+    boxes: list[tuple[tuple[int, int, int, int], str]],
+    path: Path,
+    grid_size: int = 0,
+) -> None:
+    """Save a single image panel (with optional bbox/grid overlays) as its own tightly-cropped PNG."""
+    h, w = image.shape[:2]
+    fig, ax = plt.subplots(figsize=(w / 100, h / 100), dpi=100)
+    ax.imshow(image, cmap="gray" if image.ndim == 2 else None)
+    ax.axis("off")
+    ax.set_xlim(0, w)
+    ax.set_ylim(h, 0)
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
+    draw_patch_grid(ax, h, w, grid_size)
+
+    for bbox, color in boxes:
+        if bbox is None:
+            continue
+        r_min, c_min, r_max, c_max = bbox
+        ax.add_patch(patches.Rectangle(
+            (c_min, r_min), c_max - c_min, r_max - r_min,
+            linewidth=1.5, edgecolor=color, facecolor="none",
+        ))
+
+    fig.savefig(path, dpi=150)
+    plt.close(fig)
 
 
 def main(argv=None):
@@ -189,6 +241,10 @@ def main(argv=None):
     else:
         sample_count = min(args.samples, len(paired))
         samples = rng.sample(paired, sample_count)
+
+    timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = RESULTS_DIR / "visualization" / f"run_{timestamp}"
+    run_dir.mkdir(parents=True, exist_ok=True)
 
     sample_count = len(samples)
     cols = 5
@@ -242,15 +298,51 @@ def main(argv=None):
                 linewidth=1.5, edgecolor="deepskyblue", facecolor="none",
             ))
 
-        # --- tumor crop panel ---
-        axes[crop_row][col].imshow(cropped, cmap="gray")
+        # --- tumor crop panel: same red overlay + green tight bbox, in crop coordinates ---
+        cropped_mask = crop_around_mask(mask, mask, context_fraction=args.context_fraction)
+        cropped_overlay = make_red_overlay(cropped, cropped_mask)
+        axes[crop_row][col].imshow(cropped_overlay)
+        draw_patch_grid(axes[crop_row][col], *cropped_overlay.shape[:2], args.grid_size)
 
-        # --- global crop panel ---
+        crop_bbox = tight_bbox(cropped_mask)
+        if crop_bbox is not None:
+            r_min, c_min, r_max, c_max = crop_bbox
+            axes[crop_row][col].add_patch(patches.Rectangle(
+                (c_min, r_min), c_max - c_min, r_max - r_min,
+                linewidth=1.5, edgecolor="lime", facecolor="none",
+            ))
+
+        save_panel(
+            cropped_overlay, [(crop_bbox, "lime")],
+            run_dir / f"{image_path.stem}_tumor_crop.png",
+            grid_size=args.grid_size,
+        )
+
+        # --- global crop panel: same treatment, at the global context fraction ---
         if args.global_crop:
             global_cropped = crop_around_mask(
                 image_arr, mask, context_fraction=args.global_context_fraction
             )
-            axes[global_crop_row][col].imshow(global_cropped, cmap="gray")
+            global_cropped_mask = crop_around_mask(
+                mask, mask, context_fraction=args.global_context_fraction
+            )
+            global_cropped_overlay = make_red_overlay(global_cropped, global_cropped_mask)
+            axes[global_crop_row][col].imshow(global_cropped_overlay)
+            draw_patch_grid(axes[global_crop_row][col], *global_cropped_overlay.shape[:2], args.grid_size)
+
+            global_crop_bbox = tight_bbox(global_cropped_mask)
+            if global_crop_bbox is not None:
+                r_min, c_min, r_max, c_max = global_crop_bbox
+                axes[global_crop_row][col].add_patch(patches.Rectangle(
+                    (c_min, r_min), c_max - c_min, r_max - r_min,
+                    linewidth=1.5, edgecolor="lime", facecolor="none",
+                ))
+
+            save_panel(
+                global_cropped_overlay, [(global_crop_bbox, "lime")],
+                run_dir / f"{image_path.stem}_global_crop.png",
+                grid_size=args.grid_size,
+            )
 
     for group in range(groups):
         base_row = group * rows_per_group
@@ -260,11 +352,11 @@ def main(argv=None):
             axes[base_row + 2][0].set_ylabel(f"Global Crop\n(context={args.global_context_fraction})", fontsize=11)
 
     plt.tight_layout()
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    output_path = RESULTS_DIR / f"visualize_samples_{dataset}.png"
+    output_path = run_dir / f"visualize_samples_{dataset}.png"
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"Saved to {output_path}")
+    print(f"Individual crops saved under {run_dir}")
 
 
 if __name__ == "__main__":

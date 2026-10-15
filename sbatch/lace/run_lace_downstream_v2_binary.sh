@@ -27,13 +27,30 @@ export WANDB_DIR=$home_dir/Project/logs
 export PATH=$home_dir/miniconda3/envs/$MY_CONDA_ENV/bin:$PATH
 export PYTHONPATH=$home_dir/Project/src
 
+START_TIME=$(date +%s)
+echo "Start time: $(date)"
+
 # ── Model ─────────────────────────────────────────────────────────────────────
 # Reproduction of sweep run: cls_fg / run_20260707_164235 / split_binary.json
 IMAGE_SIZE=224          # 224 = default | 512 = CheXFound-equivalent resolution
 USE_MASK=true           # apply lesion-mask cropping to input images (else the full image is just resized)
 VERSION=v2              # v1: CLS token | v2: MaskTokenDecoder (requires v2 pretrain ckpt)
-VISUAL_MODE=cls     # cls [B,512] | fg [B,512] | cls_fg [B,1024]  run_20260721_080616
+VISUAL_MODE=fg     # cls [B,512] | fg [B,512] | cls_fg [B,1024]  run_20260721_080616
 CHECKPOINT=$home_dir/Project/results/lace_v2_pretrain/run_20260930_083100/best_retrieval_checkpoint.pt
+# PRETRAIN_LOG (optional, set via `sbatch --export=ALL,PRETRAIN_LOG=...`): when set,
+# points at a chained pretrain job's .out log, and CHECKPOINT above is overridden with
+# that run's own "Run directory: ..." line (printed by pretrain_v2.py) + the standard
+# checkpoint filename — so a pretrain->downstream chain always uses the right run,
+# without hand-editing this file's hardcoded CHECKPOINT path.
+if [ -n "$PRETRAIN_LOG" ]; then
+    PRETRAIN_RUN_DIR=$(grep -m1 "^Run directory:" "$PRETRAIN_LOG" | awk '{print $NF}')
+    if [ -z "$PRETRAIN_RUN_DIR" ]; then
+        echo "PRETRAIN_LOG=$PRETRAIN_LOG set but no 'Run directory:' line found — aborting." >&2
+        exit 1
+    fi
+    CHECKPOINT="$PRETRAIN_RUN_DIR/best_retrieval_checkpoint.pt"
+    echo "Chained from pretrain job log $PRETRAIN_LOG -> checkpoint: $CHECKPOINT"
+fi
 SPLITS=$home_dir/Project/data/internal_dataset/split_binary_final.json
 BINARY=true            # true = benign vs malignant only (intermediate skipped)
 BTXRD_MANIFEST=$home_dir/Project/data/BTXRD/btxrd_downstream_binary.json
@@ -86,3 +103,9 @@ python $home_dir/Project/src/LACE/train/downstream.py \
     --wandb_entity  philipp-wiese \
     --eval_test \
     --btxrd_manifest         $BTXRD_MANIFEST \
+
+END_TIME=$(date +%s)
+ELAPSED=$((END_TIME - START_TIME))
+echo "End time: $(date)"
+printf "Downstream duration: %02dh:%02dm:%02ds (%d s total)\n" \
+    $((ELAPSED/3600)) $((ELAPSED%3600/60)) $((ELAPSED%60)) $ELAPSED

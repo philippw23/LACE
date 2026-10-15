@@ -5,7 +5,7 @@
 #SBATCH --gres=gpu:1
 #SBATCH --cpus-per-task=4
 #SBATCH --time=48:00:00
-#SBATCH --output="/mnt/nfs/homedirs/%u/Project/logs/slurm-%j_gloria_downstream_cv.out"
+#SBATCH --output="/mnt/nfs/homedirs/%u/Project/logs/slurm-%j_gloria_downstream_cv_binary.out"
 
 home_dir="/mnt/nfs/homedirs/$USER"
 export HOME=$home_dir
@@ -31,7 +31,7 @@ export PATH=$home_dir/miniconda3/envs/$MY_CONDA_ENV/bin:$PATH
 # one fold<N>/{split.json,best_retrieval_checkpoint.pt} per fold. FROZEN=false
 # tells the orchestrator to pick up each fold's own checkpoint next to its
 # split file, instead of a single fixed checkpoint used across every fold.
-CV_DIR=$home_dir/Project/results/gloria_pretrain/gloria_pretrain_unfreeze4_20260830_145459
+CV_DIR=$home_dir/Project/results/gloria_pretrain/gloria_pretrain_unfreeze4_20261006_154417
 PATTERN="fold*/split.json"
 CHECKPOINT_FILENAME=best_retrieval_checkpoint.pt
 FROZEN=false

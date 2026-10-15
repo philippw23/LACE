@@ -68,6 +68,8 @@ Reply ONLY with this JSON (no extra text):
 # A valid JSON escape pair is kept as-is; any other lone backslash (e.g. the
 # model writing "\L" for a garbled symbol) is doubled so the reply still parses.
 _JSON_ESCAPE_OR_BACKSLASH = re.compile(r'\\(["\\/bfnrt]|u[0-9a-fA-F]{4})|\\')
+# A \uXXXX followed by a lone backslash is a garbled symbol; it stays literal text.
+_GARBLED_SYMBOL_ESCAPE = re.compile(r'\\(u[0-9a-fA-F]{4})(?=\\(?!["\\/bfnrtu]))')
 
 
 def parse_json_reply(raw: str) -> dict | None:
@@ -76,7 +78,7 @@ def parse_json_reply(raw: str) -> dict | None:
     end = raw.rfind("}") + 1
     if start == -1 or end == 0:
         return None
-    body = raw[start:end]
+    body = _GARBLED_SYMBOL_ESCAPE.sub(lambda m: "\\\\" + m.group(1), raw[start:end])
     sanitized = _JSON_ESCAPE_OR_BACKSLASH.sub(
         lambda m: m.group(0) if m.group(1) else "\\\\", body
     )
@@ -182,6 +184,14 @@ def report_key(report: dict) -> tuple[str, str]:
     return (str(report["patid"]), str(report.get("accnr", "")))
 
 
+def group_by_patient(reports: list[dict]) -> list[dict]:
+    """Keep each patient's reports consecutive: patients in first-seen order, reports by date."""
+    first_seen: dict[str, int] = {}
+    for r in reports:
+        first_seen.setdefault(str(r["patid"]), len(first_seen))
+    return sorted(reports, key=lambda r: (first_seen[str(r["patid"])], str(r.get("date", ""))))
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Translate German radiology reports to English.")
     parser.add_argument("--input",    default=str(DEFAULT_INPUT))
@@ -198,7 +208,7 @@ def main() -> None:
     args = parse_args()
 
     with open(args.input, encoding="utf-8") as fh:
-        reports: list[dict] = json.load(fh)
+        reports: list[dict] = group_by_patient(json.load(fh))
 
     # Load already-translated entries for resuming
     out_path = Path(args.output)
@@ -210,6 +220,11 @@ def main() -> None:
         n_failed = sum("_error" in e for e in translated.values())
         print(f"Resuming: {len(translated) - n_failed} entries already translated, "
               f"{n_failed} failed earlier (will retry).")
+
+    # Existing output keeps its order; new reports follow in patient-grouped input order.
+    order_index = {key: i for i, key in enumerate(translated)}
+    for r in reports:
+        order_index.setdefault(report_key(r), len(order_index))
 
     def is_done(key: tuple[str, str]) -> bool:
         return key in translated and "_error" not in translated[key]
@@ -242,8 +257,9 @@ def main() -> None:
 
         # Save after every entry so progress is never lost
         out_path.parent.mkdir(parents=True, exist_ok=True)
+        entries = sorted(translated.values(), key=lambda e: order_index[report_key(e)])
         with open(out_path, "w", encoding="utf-8") as fh:
-            json.dump(list(translated.values()), fh, ensure_ascii=False, indent=2)
+            json.dump(entries, fh, ensure_ascii=False, indent=2)
 
     print(f"\nDone. {len(translated)} reports saved to {out_path}")
     if errors:

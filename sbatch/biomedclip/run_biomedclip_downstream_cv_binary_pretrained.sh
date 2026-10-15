@@ -37,7 +37,7 @@ FREEZED_BIOMEDCLIP=false   # true = vanilla BiomedCLIP weights, no checkpoint / 
 # just copied alongside each fold's checkpoint at pretrain time), and
 # CHECKPOINT_FILENAME is a bare filename looked up next to each one, so every
 # fold's downstream eval uses its own matching pretrain checkpoint.
-CV_DIR=$home_dir/Project/results/biomedclip_pretrain/run_bs128_unfreeze4_20260828_113706
+CV_DIR=$home_dir/Project/results/biomedclip_pretrain/run_bs128_unfreeze4_20261006_153926
 PATTERN="fold*/split.json"
 CHECKPOINT_FILENAME=best_r1_checkpoint.pt
 

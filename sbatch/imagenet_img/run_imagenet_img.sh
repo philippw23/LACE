@@ -10,13 +10,17 @@
 #SBATCH --error=/dev/null
 
 # ── Parameters (edit here) ────────────────────────────────────────────────────
-SPLITS="/mnt/nfs/homedirs/philippw/Project/data/internal_dataset/split.json"
-EPOCHS=100
-BATCH_SIZE=64
-LR_MLP=3e-4
-WEIGHT_DECAY=0.05
+SPLITS="/mnt/nfs/homedirs/philippw/Project/data/internal_dataset/split_binary.json"
+BTXRD_MANIFEST="/mnt/nfs/homedirs/philippw/Project/data/BTXRD/btxrd_downstream_binary.json"
+BINARY=true
+
+EPOCHS=150
+PATIENCE=30
+BATCH_SIZE=32
+LR_MLP=0.0001646564531459077
+WEIGHT_DECAY=0.0835001362514313
 DROPOUT=0.3
-HIDDEN_DIMS="64"
+HIDDEN_DIMS="[64, 32]"
 META_EMBED_DIM=0 # only used if head is mlp, e.g 16
 
 # Head mode: mlp (age+sex fusion), mlp_no_meta (image only)
@@ -24,9 +28,10 @@ HEAD="mlp_no_meta"
 # Loss: ce, wce, focal, cb_focal, balanced_softmax, ldam
 LOSS="focal"
 # Class weighting: none, inverse, sqrt, effective
-CLASS_WEIGHTING="sqrt"
-
-PATIENCE=100
+CLASS_WEIGHTING="inverse"
+FOCAL_GAMMA=3
+SEED=42
+EARLY_STOPPING_METRIC="val_bal_acc"
 # ─────────────────────────────────────────────────────────────────────────────
 
 home_dir="/mnt/nfs/homedirs/$USER"
@@ -65,8 +70,13 @@ $home_dir/miniconda3/envs/$MY_CONDA_ENV/bin/python $home_dir/Project/src/imagene
     --meta_embed_dim $META_EMBED_DIM \
     --loss           $LOSS \
     --class_weighting $CLASS_WEIGHTING \
+    --focal_gamma    $FOCAL_GAMMA \
+    --early_stopping_metric $EARLY_STOPPING_METRIC \
+    --binary         $BINARY \
+    --btxrd_manifest $BTXRD_MANIFEST \
+    --eval_test \
     --use_mask \
-    --seed           42 \
+    --seed           $SEED \
     --wandb \
     --wandb_project  imagenet-img-downstream \
     --wandb_entity   philipp-wiese

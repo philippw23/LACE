@@ -49,7 +49,7 @@ echo "Writing output to $OUTPUT"
 python_path=$home_dir/miniconda3/envs/$MY_CONDA_ENV/bin/python
 $python_path $home_dir/Project/src/qwen_llm_extractor/extract/joint.py \
     --model $MODEL \
-    --input  $home_dir/Project/data/internal_dataset/test/translated_reports2.json \
+    --input  $home_dir/Project/data/internal_dataset/test/translated_reports3.json \
     --output $OUTPUT \
     --english \
     --batch_size 4 \
