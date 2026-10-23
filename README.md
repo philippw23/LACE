@@ -2,7 +2,7 @@
 
 Domain-adapts vision-language and vision-only models to a private bone-tumor X-ray dataset, then trains a downstream MLP classifier for malignancy prediction (3-class benign / intermediate / malignant, or binary benign / malignant against the external [BTXRD](data/BTXRD) test set).
 
-Implements **LACE** (Lesion-Aligned Contrastive Embedding) — a novel curriculum-learning pretraining approach developed in this project — alongside baselines built on [BiomedCLIP](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224) (including a GLoRIA-style local-loss variant, `biomedclip_gloria`), **CheXFound** (DINO+iBOT), **GLoRIA**, and a frozen **ImageNet** encoder.
+Implements **LACE** (Lesion-Aligned Contrastive Embedding) — a novel curriculum-learning pretraining approach developed in this project — alongside baselines built on [BiomedCLIP](https://huggingface.co/microsoft/BiomedCLIP-PubMedBERT_256-vit_base_patch16_224), **CheXFound** (DINO+iBOT), **GLoRIA**, and a frozen **ImageNet** encoder.
 
 ---
 
@@ -23,9 +23,6 @@ src/
 │   ├── data/ distributed/ eval/ loss/ models/ utils/
 │   └── train/                #   pretrain.py, downstream.py, downstream_eval.py,
 │                              #   img_text_downstream.py, sweep YAMLs — all entry points
-│
-├── biomedclip_gloria/          # BiomedCLIP pretraining + GLoRIA-style local loss
-│   └── train/pretrain.py       #   Entry point (downstream reuses biomedclip/train/downstream.py)
 │
 ├── chexfound/                 # CheXFound DINO+iBOT continued pretraining
 │   └── train/                #   pretrain.py, downstream.py, downstream_eval.py
@@ -55,8 +52,8 @@ src/
 │   ├── visualize_samples.py    # Sample visualisation
 │   └── visualize_tsne.py       # t-SNE embedding visualisation across baselines
 
-sbatch/                         # SLURM job scripts, mirrors src/ (biomedclip/, biomedclip_gloria/,
-                                 # lace/, chexfound/, gloria/, imagenet_img/, data/, utils/)
+sbatch/                         # SLURM job scripts, mirrors src/ (biomedclip/, lace/, chexfound/,
+                                 # gloria/, imagenet_img/, data/, utils/)
 data/
 ├── internal_dataset/
 │   ├── images/ segmentations/ metadata.xlsx
@@ -151,9 +148,6 @@ sbatch sbatch/chexfound/run_chexfound_pretrain.sh
 
 # GLoRIA pretraining (own environment — see Requirements)
 sbatch sbatch/gloria/run_gloria_pretrain.sh
-
-# BiomedCLIP + GLoRIA-style local loss pretraining variant
-sbatch sbatch/biomedclip_gloria/run_biomedclip_gloria_pretrain.sh
 ```
 
 BiomedCLIP key arguments:
@@ -185,7 +179,7 @@ Every approach follows the same pattern: `<baseline>/train/downstream.py` loads 
 
 ```bash
 sbatch sbatch/lace/run_lace_downstream_v2.sh
-sbatch sbatch/biomedclip/run_biomedclip_downstream.sh     # also used for the biomedclip_gloria checkpoint
+sbatch sbatch/biomedclip/run_biomedclip_downstream.sh
 sbatch sbatch/chexfound/run_chexfound_downstream.sh
 sbatch sbatch/gloria/run_gloria_downstream.sh
 sbatch sbatch/imagenet_img/run_imagenet_img.sh

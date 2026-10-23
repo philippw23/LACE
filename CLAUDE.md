@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Bone-tumor malignancy classification research project using domain-adapted vision-language models. The pipeline adapts BiomedCLIP (ViT-B/16 + PubMedBERT) to a private internal bone-tumor X-ray dataset via contrastive pretraining, then trains a downstream malignancy classifier (3-class: benign/intermediate/malignant, with a `--binary` benign/malignant mode used against the external BTXRD test set).
 
-Baselines implemented: **BiomedCLIP** contrastive pretraining (optionally with a GLoRIA-style local loss added, `biomedclip_gloria`), **CheXFound** (DINO+iBOT), **GLoRIA**, and an **ImageNet-pretrained** frozen linear probe — alongside **LACE** (Lesion-Aligned Contrastive Embedding), the novel curriculum-learning approach developed in this project. LACE runs a configurable 2-stage curriculum with a mask decoder and prototype/evidential losses; see [src/LACE/ARCHITECTURE.md](src/LACE/ARCHITECTURE.md). (An earlier v1 design — all losses active from epoch 1, no mask decoder — has been retired; see git history if needed.)
+Baselines implemented: **BiomedCLIP** contrastive pretraining, **CheXFound** (DINO+iBOT), **GLoRIA**, and an **ImageNet-pretrained** frozen linear probe — alongside **LACE** (Lesion-Aligned Contrastive Embedding), the novel curriculum-learning approach developed in this project. LACE runs a configurable 2-stage curriculum with a mask decoder and prototype/evidential losses; see [src/LACE/ARCHITECTURE.md](src/LACE/ARCHITECTURE.md). (An earlier v1 design — all losses active from epoch 1, no mask decoder — has been retired; see git history if needed.)
 
 ## Running Experiments
 
@@ -36,9 +36,6 @@ sbatch sbatch/gloria/run_gloria_downstream_eval.sh
 
 # Additional baseline (image-only frozen ImageNet probe)
 sbatch sbatch/imagenet_img/run_imagenet_img.sh
-
-# BiomedCLIP + GLoRIA-style local loss pretraining variant
-sbatch sbatch/biomedclip_gloria/run_biomedclip_gloria_pretrain.sh
 
 # LLM phrase extraction (Qwen2.5-7B)
 sbatch sbatch/data/run_llm_extractor.sh
@@ -118,7 +115,6 @@ Continued pretraining with DINO + iBOT joint objective ([src/chexfound/train/ssl
 ### Additional baselines
 
 - **ImageNet** ([src/imagenet_img/](src/imagenet_img/)): frozen ImageNet-1k ViT-B/16, linear probe only (`src/imagenet_img/train/downstream.py`).
-- **BiomedCLIP + GLoRIA** ([src/biomedclip_gloria/](src/biomedclip_gloria/)): BiomedCLIP contrastive pretraining with an added GLoRIA-style local (word/region) loss (`src/biomedclip_gloria/train/pretrain.py`); downstream classification reuses `biomedclip/train/downstream.py`/`downstream_eval.py` pointed at the resulting checkpoint.
 
 ### Downstream classifiers & eval scripts
 
